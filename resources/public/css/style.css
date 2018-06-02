@@ -1,2 +1,80 @@
-/* some style */
+html
+{
+    box-sizing: border-box;
+}
 
+*,
+*:before,
+*:after
+{
+    box-sizing: inherit;
+}
+
+body,
+html
+{
+    height: 100%;
+
+    background-color: #333;
+}
+
+#app
+{
+    height: 100%;
+}
+
+.container
+{
+    font-size: 48px;
+    line-height: 1.618;
+
+    display: flex;
+
+    height: 100%;
+
+    letter-spacing: -.005em;
+
+    flex-flow: row wrap;
+    justify-content: space-evenly;
+    align-items: baseline;
+}
+
+.container > *
+{
+    flex: 1;
+}
+
+.volume-card
+{
+    font-size: 32px;
+
+    margin: 20px;
+    padding: 20px;
+
+    color: #c8c8c8;
+}
+
+.volume-card input
+{
+    font-size: 48px;
+    font-weight: 600;
+    line-height: 1.618;
+
+    width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+
+    color: #fff;
+    border: none;
+    background-color: #282828;
+}
+
+.volume
+{
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.618;
+    
+    color: #fff;
+}
