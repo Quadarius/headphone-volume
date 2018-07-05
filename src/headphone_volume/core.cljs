@@ -1,98 +1,132 @@
 (ns headphone-volume.core
     (:require
       [rum.core :as rum]
-      [headphone-volume.conversion :as c]))
+      [headphone-volume.convert :as c]))
 
 (enable-console-print!)
 ; (js* "debugger;")
 
-(defonce output { :lo 1.7341133939350357
-                  :hi 9.751636239757621
-                  :iem 0.548372446 })
+(defrecord source [name voltage])
+(def rme-lo (->source "RME ADI-2 DAC LO OUTPUT" 1.73))
+(def rme-hi (->source "RME ADI-2 DAC HI OUTPUT" 10))
+(def rme-iem (->source "RME ADI-2 DAC IEM OUTPUT" 0.55))
+(def sources [rme-lo rme-hi rme-iem])
+(defrecord headphone [name sensitivity sensitivity-type impedance voltage90db])
+(def THX00
+  (map->headphone {:name "Fostex TH-X00"
+                   :sensitivity 94
+                   :impedance 25
+                   :sensitivity-type :current
+                   :voltage90db 0.068}))
+(def R70x
+  (map->headphone {:name "Audio Technica ATH-R70x"
+                   :sensitivity 98
+                   :impedance 470
+                   :sensitivity-type :current
+                   :voltage90db 0.195}))
+(def HD58X
+  (map->headphone {:name "Sennheiser HD 58X Jubilee"
+                   :sensitivity 104
+                   :impedance 150
+                   :sensitivity-type :voltage
+                   :voltage90db nil}))
+(def HE400i
+  (map->headphone {:name "HIFIMAN HE400i"
+                   :sensitivity 93
+                   :impedance 35
+                   :sensitivity-type :current
+                   :voltage90db 0.168}))
+(def LCD2C
+  (map->headphone {:name "AUDEZE LCD2 Classic"
+                   :sensitivity 101
+                   :impedance 70
+                   :sensitivity-type :current
+                   :voltage90db 0.110}))
 
-(defonce voltage-data (atom {:tspl 70 :sensitivity 105 :reqvolt nil :impedance 150}))
-(defonce power-data (atom {:tspl 70 :efficiency 99 :ref 1.4 :impedance 470}))
+(def headphones [THX00 R70x HD58X HE400i LCD2C])
 
-(rum/defc create-slider [params param value min max]
-  [:input {:type "range" :value value :min min :max max
-           :style {:width "100%"}
-           :class [""]
-           :on-change (fn [e]
-                        (swap! params assoc param (.. e -target -value))
-                        (when (not= param :vol)
-                          (swap! params assoc :vol nil)))}])
+(defonce app-state (atom {:target-peak 75
+                          :voltage-required nil
+                          :current-required nil
+                          :lo nil
+                          :hi nil
+                          :iem nil
+                          :headphone (first headphones)
+                          :use90db false}))
 
-(rum/defc create-input-field [params param value]
-  [:input {:type "text" :value value
-           :style { :witdh "100%"}
-           :class ["calc-input"]
-           :on-change (fn [e]
-                        (swap! params assoc param (.. e -target -value))
-                        (when (not= param :vol)
-                          (swap! params assoc :vol nil)))}])
+(rum/defc render-headphone
+  [headphone]
+  [:div
+   [:div (:name headphone)]
+   [:div "Impedance " (:impedance headphone)]
+   [:div "Sensitivity " (:sensitivity headphone)]])
 
-(defn gain-based-on-sensitivity
-  "Calculates gain required to reach target loudness based on voltage sensitivity"
-  [{ :keys [tspl sensitivity vol reqvolt] :as data}]
-  (let [v (c/voltage-required tspl sensitivity)]
-    (if (nil? vol)
-      (assoc data :vol (c/voltage-gain-required v (:lo output)))
-      (assoc data :reqvolt (c/voltage-required tspl sensitivity)))))
+(rum/defc render-results
+  [l h i voltage current]
+  [:div.volume-card
+   [:div.result "Required Gain LO: " (Math/floor l)]
+   [:div.result "Required Gain HI: " (Math/floor h)]
+   [:div.result "Required Gain IEM: " (Math/floor i)]
+   [:div.result "required voltage: " voltage]
+   [:div.result "required current: " current]])
 
-(defn gain-based-on-efficiency
-  "Calculates gain required to reach target loudness based on power efficiency"
-  [{ :keys [tspl efficiency vol impedance] :as data}]
-  (let [p (c/power-required tspl efficiency)
-        v (c/power-to-voltage p impedance)]
-    (if (nil? vol)
-      (assoc data :vol (c/voltage-gain-required v (:lo output))))))
+(rum/defc render-target-peak [target-peak state]
+  [:div
+    [:label "Peak SPL: " target-peak]
+    [:input {:type "range" :value target-peak :min 40 :max 110
+             :style {:width "100%"}
+             :on-change (fn [e]
+                           (swap! state assoc :target-peak (.. e -target -value)))}]])
+  
 
-(defn pretty-volume [vol]
-  (Math/floor vol))
+(rum/defc render-app [headphone lo hi iem voltage current target-peak state]
+  [:div
+    (render-headphone headphone)
+    (render-results lo hi iem voltage current)
+    (render-target-peak target-peak state)])
 
-; (rum/defc)
+(defn do-the-calculations-c [{:keys [target-peak headphone] :as state}]
+    (let [c (c/efficiency-to-power target-peak (:sensitivity headphone))
+          v (c/power-to-voltage c (:impedance headphone))
+          lo (c/voltage-to-gain v (:voltage rme-lo))
+          hi (c/voltage-to-gain v (:voltage rme-hi))
+          iem (c/voltage-to-gain v (:voltage rme-iem))]
+      (println (str target-peak))
+      (assoc state :lo lo :hi hi :iem iem :voltage-required v :current-required c)))
 
-(rum/defc volume-calculator-sensitivity < rum/reactive []
-  (let [{:keys [tspl sensitivity vol reqvolt]} (gain-based-on-sensitivity (rum/react voltage-data))]
-    [:div.volume-card
-      [:h2.volume "Volume: " (pretty-volume vol)]
-      ; [:div vol]
-      ; [:div "required voltage: " (c/voltage-required tspl sensitivity)]
-      [:form
-        [:div
-          [:label "Target SPL: " tspl
-            (create-slider voltage-data :tspl tspl 40 110)]]
-        [:div 
-          [:label "Sensitivity (dB/Vrms): "
-            (create-input-field voltage-data :sensitivity sensitivity)]]]]))
 
-(rum/defc volume-calculator-efficiency < rum/reactive []
-  (let [{:keys [tspl efficiency vol impedance]} (gain-based-on-efficiency (rum/react power-data))]
-    [:div.volume-card
-      [:h3.volume "Volume: " (pretty-volume vol)]
-      ; [:div "required voltage: " (c/power-to-voltage (c/power-required tspl efficiency) impedance)]
-      [:form
-        [:div
-          [:label "Target SPL: " tspl
-            (create-slider power-data :tspl tspl 40 110)]
-        [:div
-          [:label "Sensitivity (dB/mW): "
-            (create-input-field power-data :efficiency efficiency)]]
-        [:div
-          [:label "Impedance: "
-            (create-input-field power-data :impedance impedance)]]]]]))
+(defn do-the-calculations-v [{:keys [target-peak headphone] :as state}]
+  (let [v (c/sensitivity-to-voltage target-peak (:sensitivity headphone))
+        c (c/voltage-to-power v (:impedance headphone))
+        lo (c/voltage-to-gain v (:voltage rme-lo))
+        hi (c/voltage-to-gain v (:voltage rme-hi))
+        iem (c/voltage-to-gain v (:voltage rme-iem))]
+    (println v)
+    (assoc state :lo lo :hi hi :iem iem :voltage-required v :current-required c)))
+
+(defn do-the-calculations
+  [{:keys [target-peak headphone] :as state}]
+  (cond
+    (= (:sensitivity-type headphone) :current) (do-the-calculations-c state)))
+
+
+(rum/defc app-container < rum/reactive []
+  (let [{:keys [headphone lo hi iem voltage-required current-required target-peak]} (do-the-calculations (rum/react app-state))]
+
+    (render-app headphone lo hi iem voltage-required current-required target-peak app-state)))
 
 (rum/defc app []
-  [:div.container
-   (rum/with-key (volume-calculator-sensitivity) "volt")
-   (rum/with-key (volume-calculator-efficiency) "powr")])
 
-(println (c/voltage-required (:tspl @voltage-data) (:sensitivity @voltage-data)))
+  [:div.container 
+    (app-container)])
+  ;[:div.container "ASSSS"])
+
+
 
 (rum/mount (app) (js/document.getElementById "app"))
 
-(defn on-js-reload []
+(defn on-js-reload [])
   ;; optionally touch your app-state to force rerendering depending on
   ;; your application
   ;; (swap! app-state update-in [:__figwheel_counter] inc)
-)
+

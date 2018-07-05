@@ -6,5 +6,7 @@ var deploy = require('gulp-gh-pages');
  */
 gulp.task('deploy', function () {
     return gulp.src('./resources/public/**/*')
-        .pipe(deploy({ force: true }))
+        .pipe(deploy({
+            remoteUrl: "https://github.com/Quadarius/headphone-volume.git"
+        }))
 });
