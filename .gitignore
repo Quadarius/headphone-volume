@@ -15,3 +15,5 @@ pom.xml
 .nrepl-port
 package-lock.json
 .rebel_readline_history
+
+npm-debug\.log
