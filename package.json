@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "Quadarius Moore <qmoore360@gmail.com>",
   "license": "ISC",
   "devDependencies": {
     "gulp": "^4.0.0",
