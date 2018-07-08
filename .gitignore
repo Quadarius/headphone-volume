@@ -14,3 +14,4 @@ pom.xml
 .repl
 .nrepl-port
 package-lock.json
+.rebel_readline_history

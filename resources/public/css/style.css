@@ -44,6 +44,10 @@ html
     flex: 1;
 }
 
+/* .headphone-selector {
+  position: relative;
+} */
+
 .volume-card
 {
     font-size: 32px;
@@ -75,6 +79,6 @@ html
     font-size: 56px;
     font-weight: 800;
     line-height: 1.618;
-    
+
     color: #fff;
 }
